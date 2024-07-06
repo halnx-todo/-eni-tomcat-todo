@@ -55,19 +55,15 @@ MULTIPART_LOCATION=/usr/local/tomcat/files &&\
 DB_DTB_JDBC_URL="jdbc:mysql://mariadb:3306/db_todo" &&\
 DB_DTB_PASSWORD="mypassword-quoor-uHoe7z" &&\
 DB_DTB_USERNAME="springuser" &&\
-docker build -t eni-todo:tomcat-mariadb-harcoded \
+docker build -t tomcat-eni-todo:v20.04-tomcat-mariadb-harcoded \
    --build-arg MULTIPART_LOCATION="${MULTIPART_LOCATION}" \
    --build-arg DB_DTB_JDBC_URL="${DB_DTB_JDBC_URL}" \
    --build-arg DB_DTB_USERNAME="${DB_DTB_USERNAME}" \
    --build-arg DB_DTB_PASSWORD="${DB_DTB_USERNAME}" \
    --target eni-todo-tomcat-mariadb-harcoded . &&\
-docker build -t eni-todo:tomcat-h2-env --target eni-todo-tomcat-h2-env . &&\   
-docker build -t eni-todo:tomcat-mariadb-env --target eni-todo-tomcat-mariadb-env . &&\
-docker build -t eni-todo:tomcat-mariadb-kub --target eni-todo-tomcat-mariadb-kub . &&\
-docker build -t eni-todo:boot-h2-env --target eni-todo-boot-h2-env . &&\
-docker build -t eni-todo:boot-mariadb-env --target eni-todo-boot-mariadb-env .
-
-###@todo docker build -t eni-todo-boot-mariadb-kube:latest --target eni-todo-boot-mariadb-kub .
+docker build -t tomcat-eni-todo:v20.04-tomcat-h2-env --target eni-todo-tomcat-h2-env . &&\   
+docker build -t tomcat-eni-todo:v20.04-tomcat-mariadb-env --target eni-todo-tomcat-mariadb-env . &&\
+docker build -t tomcat-eni-todo:v20.04-tomcat-mariadb-kub --target eni-todo-tomcat-mariadb-kub . 
 ```
 
 ```bash
@@ -85,10 +81,13 @@ docker build -t eni-todo:tomcat-mariadb-harcoded \
 docker build -t eni-todo-tomcat-h2:latest --target eni-todo-tomcat-h2-env . &&\   
 docker build -t eni-todo-tomcat-mariadb:latest --target eni-todo-tomcat-mariadb-env . &&\
 docker build -t eni-todo:tomcat-mariadb-kub --target eni-todo-tomcat-mariadb-kub . &&\
-docker build -t eni-todo:boot-h2-env --target eni-todo-boot-h2-env . &&\
-docker build -t eni-todo:boot-mariadb-env --target eni-todo-boot-mariadb-env .
 
-###@todo docker build -t eni-todo-boot-mariadb-kube:latest --target eni-todo-boot-mariadb-kub .
+```
+
+## run tomcat-h2
+
+```bash
+docker run --rm -d --name=24.04-tomcat-h2-env -p 8080:8080 tomcat-eni-todo:v20.04-tomcat-h2-env
 ```
 
 ## run tomcat-mariadb-harcoded
