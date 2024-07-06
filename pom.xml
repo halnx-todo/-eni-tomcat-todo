@@ -5,30 +5,30 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>net.diehard.sample.todowebsite</groupId>
     <artifactId>eni-todo</artifactId>
-    <version>0.2-SNAPSHOT</version>
+    <version>24.04.-SNAPSHOT</version>
     <packaging>${override.packaging}</packaging>
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.3.5.RELEASE</version>
+        <version>3.2.5</version>
         <relativePath/>
     </parent>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
-        <java.version>11</java.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <java.version>21</java.version>
         <!-- webjar parameter -->
-        <webjars-locator-core.version>0.46</webjars-locator-core.version>
-        <bootstrap.version>3.4.1</bootstrap.version>
-        <jquery.version>3.5.1</jquery.version>
+        <webjars-locator-core.version>0.58</webjars-locator-core.version>
+        <bootstrap.version>5.3.3</bootstrap.version>
+        <jquery.version>3.7.1</jquery.version>
         <!-- persistance parameter -->
         <override.packaging>war</override.packaging>
         <com.h2database.jdbc.dependency.scope>test</com.h2database.jdbc.dependency.scope>
         <com.mariadb.jdbc.dependency.scope>runtime</com.mariadb.jdbc.dependency.scope>
         <!-- build parameter-->
-        <mariajdbcurl>jdbc:mysql://127.0.0.1:3306/db_todo</mariajdbcurl>
+        <mariajdbcurl>jdbc:mariadb://127.0.0.1:3306/db_todo</mariajdbcurl>
         <mariadbusername>springuser</mariadbusername>
         <mariadbpasswd>mypassword-quoor-uHoe7z</mariadbpasswd>
         <multipartlocation>${java.io.tmpdir}</multipartlocation>
@@ -114,7 +114,7 @@
         <dependency>
             <groupId>org.junit.vintage</groupId>
             <artifactId>junit-vintage-engine</artifactId>
-            <version>5.6.3</version>
+            <version>5.10.2</version>
             <scope>test</scope>
         </dependency>
 
@@ -138,6 +138,47 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>jmeter</id>
+            <properties>
+                <override.packaging>war</override.packaging>
+                <com.h2database.jdbc.dependency.scope>runtime</com.h2database.jdbc.dependency.scope>
+                <com.mariadb.jdbc.dependency.scope>test</com.mariadb.jdbc.dependency.scope>
+            </properties>
+            <build>
+                <finalName>${project.artifactId}-tomcat-h2</finalName>
+                <plugins>
+                    <plugin>
+                        <groupId>com.lazerycode.jmeter</groupId>
+                        <artifactId>jmeter-maven-plugin</artifactId>
+                        <version>3.8.0</version>
+                        <configuration>
+                            <errorRateThresholdInPercent>10</errorRateThresholdInPercent>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>configuration</id>
+                                <goals>
+                                    <goal>configure</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>jmeter-tests</id>
+                                <goals>
+                                    <goal>jmeter</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>jmeter-check-results</id>
+                                <goals>
+                                    <goal>results</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>tomcat-h2</id>
             <properties>

@@ -1,49 +1,51 @@
 package net.diehard.sample.todowebsite;
 
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import net.diehard.sample.todowebsite.todo.SessionUnsavedList;
 import net.diehard.sample.todowebsite.todo.TodoItem;
 import net.diehard.sample.todowebsite.todo.TodoItemRepository;
 import net.diehard.sample.todowebsite.todo.TodoListViewModel;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.ScopedProxyMode;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.annotation.SessionScope;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import java.io.IOException;
+import java.io.Serial;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
+import java.util.Objects;
 import java.util.logging.Logger;
 
 @Controller
-public class TodoController {
+@ComponentScan
+public class TodoController implements Serializable{
 
 
     private static final Logger LOG = Logger.getLogger(TodoController.class.getCanonicalName());
-    private static final long serialVersionUID = 8570655773280783303L;
+    @Serial
+    private static final long serialVersionUID = 7646230512286143109L;
 
+    @Value("${spring.servlet.multipart.location}")
+    private String storageLocation;
 
     private final TodoItemRepository repository;
 
     private final SessionUnsavedList todoUnsavedList;
-    private final FileService fileService;
-    private long sessionIndex = 0;
 
-    public TodoController(TodoItemRepository repository, SessionUnsavedList todoUnsavedList, FileService fileService) {
+    private long sessionIndex = -1;
+
+    public TodoController(TodoItemRepository repository, SessionUnsavedList todoUnsavedList) {
         this.repository = repository;
         this.todoUnsavedList = todoUnsavedList;
-        this.fileService = fileService;
     }
 
     @RequestMapping("/")
@@ -60,17 +62,21 @@ public class TodoController {
     }
 
     @RequestMapping("/add")
-    public String addTodo(HttpSession session, @RequestParam("file") MultipartFile file, @ModelAttribute TodoItem requestItem) {
+    public String addTodo(HttpSession session, @RequestParam(name="file", required = false) MultipartFile file, @ModelAttribute TodoItem requestItem) {
         LOG.info("/add called ");
         TodoItem item = new TodoItem(requestItem.getCategory(), requestItem.getName());
         item.setOnlyinsession(requestItem.isOnlyinsession());
 
         LOG.finer("requestItem : " + requestItem);
         //Check that the file is uploaded
-        if (!file.isEmpty()) {
-            String tmpFileName = fileService.storeFile(file);
+        if (Objects.nonNull(file) && !file.isEmpty()) {
+            String tmpFileName = FileService.storeFile(file, storageLocation);
             item.setFilename(tmpFileName);
+        }else{
+            LOG.finer("file : " + file);
+            item.setFilename("");
         }
+
         if (requestItem.isOnlyinsession()) {
             item.setId(sessionIndex--);
             LOG.finer("requestItem : " + item);
@@ -86,12 +92,16 @@ public class TodoController {
     public String updateTodo(HttpSession session, @ModelAttribute TodoListViewModel requestItems) {
         LOG.info("/update called ");
         for (TodoItem requestItem : requestItems.getTodoList()) {
-            LOG.finer("update requestItem : " + requestItem);
+            LOG.info("update requestItem : " + requestItem);
             Long index = requestItem.getId();
+            if(Objects.isNull(requestItem.getId())) {
+                continue;
+            }
             // index < 1 means todoitems in sessions (not in database)
             if (index < 1) {
                 // todo is draft
                 if (requestItem.isDelete()) {
+                    LOG.info("delete requestItem : " + requestItem);
                     todoUnsavedList.remove(requestItem);
                     session.setAttribute("SessionUnsavedList",
                             todoUnsavedList);
@@ -102,10 +112,12 @@ public class TodoController {
                     saveTodo(requestItem);
                 }
             }else if (requestItem.isDelete()) {
+                LOG.info("delete requestItem : " + requestItem);
                 TodoItem item = new TodoItem(requestItem.getCategory(), requestItem.getName());
                 item.setId(requestItem.getId());
                 repository.delete(item);
             } else {
+                LOG.info("save requestItem : " + requestItem);
                 saveTodo(requestItem);
             }
         }
@@ -124,7 +136,7 @@ public class TodoController {
     //this is a very dirty trick
     //It is used into index.html in order to display hostname (aka name of the pod)
     private String getHostname() {
-        String hostName = "";
+        String hostName;
         try {
             hostName = InetAddress.getLocalHost().getHostName();
             return hostName;
@@ -140,7 +152,7 @@ public class TodoController {
             @PathVariable("filename") String fileName,
             HttpServletResponse response) throws IOException {
 
-            Resource resource = fileService.loadFileAsResource(fileName);
+            Resource resource = FileService.loadFileAsResource(storageLocation,fileName);
             if (resource != null) {
                 FileCopyUtils.copy(resource.getInputStream(), response.getOutputStream());
                 response.flushBuffer();

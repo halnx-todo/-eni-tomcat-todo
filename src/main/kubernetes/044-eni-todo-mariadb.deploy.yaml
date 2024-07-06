@@ -4,7 +4,6 @@ kind: Deployment
 metadata:
   annotations:
     deployment.kubernetes.io/revision: "1"
-  generation: 1
   labels:
     app: eni-todo
   name: eni-todo
@@ -38,7 +37,7 @@ spec:
         - name: DB_DTB_PASSWORD
           value: "mypassword-quoor-uHoe7z"
         - name: DB_DTB_JDBC_URL
-          value: "jdbc:mysql://mariadb-0.mariadb:3306/db_todo"
+          value: "jdbc:mariadb://mariadb-0.mariadb:3306/db_todo"
         - name: MULTIPART_LOCATION
           value: "/usr/local/tomcat/files"
         ports:

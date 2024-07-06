@@ -1,14 +1,13 @@
 package net.diehard.sample.todowebsite.todo;
 
-import javax.validation.Valid;
-import java.io.Serializable;
-import java.util.ArrayList;
+import jakarta.validation.Valid;
+
 import java.util.List;
 
 public class TodoListViewModel {
 
     @Valid
-    private List<TodoItem> todoList = new ArrayList<>();
+    private List<TodoItem> todoList;
 
     public TodoListViewModel(List<TodoItem> todoList) {
         this.todoList = todoList;

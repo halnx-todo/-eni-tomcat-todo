@@ -5,16 +5,14 @@
  */
 package net.diehard.sample.todowebsite;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.net.InetAddress;
-import java.util.Date;
-import java.util.Enumeration;
+import java.io.Serial;
 
 /**
  * This Servlet if for liveness prob
@@ -23,7 +21,8 @@ import java.util.Enumeration;
  */
 public class OkServlet extends HttpServlet {
 
-    private static final long serialVersionUID = 6207437450268879559L;
+    @Serial
+    private static final long serialVersionUID = 4336385076560193390L;
 
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
@@ -31,7 +30,6 @@ public class OkServlet extends HttpServlet {
      *
      * @param request  servlet request
      * @param response servlet response
-     * @throws ServletException if a servlet-specific error occurs
      * @throws IOException      if an I/O error occurs
      */
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)

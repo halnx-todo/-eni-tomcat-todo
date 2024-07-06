@@ -1,16 +1,12 @@
 package net.diehard.sample.todowebsite;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
-import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.context.annotation.SessionScope;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,16 +17,12 @@ import java.util.logging.Logger;
 /**
  * Cette classe ne produit pas d'exception, mais trace des WARN logs
  */
-@Service
 public class FileService {
 
     private static final Logger _log = Logger.getLogger(FileService.class.getCanonicalName());
 
-    @Value("${spring.servlet.multipart.location}")
-    private String storageLocation;
 
-
-    public String storeFile(MultipartFile file) {
+    public static String storeFile(MultipartFile file, String storageLocation) {
         if (file ==null){
             return null;
         }
@@ -53,7 +45,7 @@ public class FileService {
         return null;
     }
 
-    public Resource loadFileAsResource(String fileName) {
+    public static Resource loadFileAsResource(String storageLocation, String fileName) {
         try {
             Path fileStorageLocation = new File(storageLocation).toPath();
             Path filePath = fileStorageLocation.resolve(fileName).normalize();

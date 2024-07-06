@@ -1,18 +1,25 @@
 # This is a Dockerfile for pedagogical purpose
 # It can be use to build the docker image manually :
 #
+# docker volume create maven
+# docker build -v /tmp/.m2 -t eni-todo-tomcat:latest --target eni-todo-tomcat-latest . &&\
+# docker build -t eni-todo-tomcat-mariadb:latest --target eni-todo-tomcat-mariadb-latest . &&\
+# docker build -t eni-todo:latest --target eni-todo .
 
-FROM maven:3.6-openjdk-11-slim AS builder
+FROM maven:3.9-eclipse-temurin-21-jammy AS builder
 ARG SKIP_TESTS="true"
 ### pour la version tomcat-mariadb-harcoded-war
 ARG MULTIPART_LOCATION=/usr/local/tomcat/files
-ARG DB_DTB_JDBC_URL='jdbc:mysql://127.0.0.1:3306/db_todo'
+ARG DB_DTB_JDBC_URL='jdbc:mariadb://127.0.0.1:3306/db_todo'
 ARG DB_DTB_USERNAME="springuser"
 ARG DB_DTB_PASSWORD="mypassword-quoor-uHoe7z"
 
 
 COPY pom.xml .
 RUN  mvn --batch-mode dependency:copy-dependencies dependency:copy-dependencies dependency:go-offline
+#COPY src/maim/java/net/diehard/sample/todowebsite/Application.java ./src/maim/java/net/diehard/sample/todowebsite/Application.java
+#RUN  --mount=type=cache,target=/tmp/.m2 mvn --batch-mode package -P simpleapp -Dmaven.repo.local=/tmp/.m2 -DskipTests=${SKIP_TESTS}
+#RUN  --mount=type=cache,target=/tmp/.m2 mvn --batch-mode package -P tomcat-h2 -Dmaven.repo.local=/tmp/.m2 -DskipTests=${SKIP_TESTS}
 
 COPY src ./src
 
@@ -29,8 +36,7 @@ RUN  --mount=type=cache,target=/var/cache/m2 mvn --batch-mode package -P tomcat-
 #RUN  mvn --batch-mode package -P tomcat-mariadb -Dmaven.repo.local=/var/cache/m2 -DskipTests=${SKIP_TESTS}
 
 ####### eni-todo-tomcat-base #######
-
-FROM tomcat:9-jre11-temurin AS eni-todo-tomcat-base
+FROM tomcat:10.1-jre21-temurin-jammy AS eni-todo-tomcat-base
 
 ARG MULTIPART_LOCATION=/usr/local/tomcat/files
 
@@ -64,6 +70,10 @@ COPY --from=builder  /target/eni-todo-tomcat-mariadb.war /usr/local/tomcat/webap
 FROM eni-todo-tomcat-base AS eni-todo-tomcat-mariadb-env
 ENV SPRING_PROFILES_ACTIVE=tomcat-mariadb-env
 
+ADD src/main/conf/catalina.properties            /usr/local/tomcat/conf/catalina.properties
+ADD src/main/conf/logging.properties             /usr/local/tomcat/conf/logging.properties
+# ADD src/test/jmeter/web-tomcat-mariadb-debug.xml /usr/local/tomcat/conf/web.xml
+
 COPY --from=builder  /target/eni-todo-tomcat-mariadb.war /usr/local/tomcat/webapps/eni-todo.war
 
 ####### eni-todo-tomcat-mariadb-kub #######
@@ -78,7 +88,7 @@ ADD src/main/conf/context-tomcat-mariadb-kub.xml /usr/local/tomcat/conf/context.
 COPY --from=builder  /target/eni-todo-tomcat-mariadb.war /usr/local/tomcat/webapps/eni-todo.war
 
 ####### eni-todo-boot-base #######
-FROM  adoptopenjdk:11-jre-hotspot AS eni-todo-boot-base
+FROM  eclipse-temurin:21-jre-jammy AS eni-todo-boot-base
 
 ARG MULTIPART_LOCATION=/usr/local/eni-todo/files
 
@@ -112,3 +122,4 @@ ENV SPRING_PROFILES_ACTIVE=boot-mariadb-env
 COPY --from=builder --chown=1000:0 /target/eni-todo-boot-mariadb.jar /usr/local/eni-todo/eni-todo.jar
 
 ####### eni-todo-boot-mariadb-kube #######
+#@TODO

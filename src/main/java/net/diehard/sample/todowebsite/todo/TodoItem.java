@@ -1,8 +1,8 @@
 package net.diehard.sample.todowebsite.todo;
 
+import jakarta.persistence.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.persistence.*;
 import java.io.Serializable;
 import java.util.Objects;
 

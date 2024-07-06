@@ -5,13 +5,14 @@
  */
 package net.diehard.sample.todowebsite;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.Serial;
 import java.net.InetAddress;
 import java.util.Date;
 import java.util.Enumeration;
@@ -23,7 +24,8 @@ import java.util.Enumeration;
  */
 public class BasicServlet extends HttpServlet {
 
-    private static final long serialVersionUID = 4547745550430336561L;
+    @Serial
+    private static final long serialVersionUID = 2452098580777027008L;
 
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
@@ -47,19 +49,39 @@ public class BasicServlet extends HttpServlet {
             String hostName = InetAddress.getLocalHost().getHostName();
 
             StringBuilder sb = new StringBuilder();
-            sb.append("<html><head>\n" + "<meta charset=\"UTF-8\">\n" + "<title>Sessions Example</title>\n" + "</head><body bgcolor=\"white\">\n" + "<h3>Sessions Example</h3>\n" + "Session ID: ").append(session.getId()).append("<br />\n").append("HostName: <b>").append(hostName).append("</b><br />\n").append("Created: ").append(created.toString()).append(" <br />\n").append("Last Accessed: ").append(accessed.toString()).append(" <br />\n")
-                    .append("<p>The following data is in your session:<br /></p><p></p><form action=\"BasicServlet\" method=\"POST\">Name of Session Attribute:<input type=\"text\" size=\"20\" name=\"dataname\"><br />Value of Session Attribute:<input type=\"text\" size=\"20\" name=\"datavalue\"><br /><input type=\"submit\"></form><p>GET based form:<br /> </p><form action=\"BasicServlet\" method=\"GET\">Name of Session Attribute:<input type=\"text\" size=\"20\" name=\"dataname\"><br />Value of Session Attribute:<input type=\"text\" size=\"20\" name=\"datavalue\"><br /><input type=\"submit\"></form><p><a href=\"BasicServlet?dataname=foo&amp;datavalue=bar\">URL encoded </a></p></body>");
+            sb.append("""
+                            <html><head>
+                            <meta charset="UTF-8">
+                            <title>Sessions Example</title>
+                            </head><body bgcolor="white">
+                            <h3>Sessions Example</h3>
+                            Session ID:\s""")
+                    .append(session.getId()).append("<br />\n")
+                    .append("HostName: <b>").append(hostName).append("</b><br />\n")
+                    .append("Created: ").append(created).append(" <br />\n")
+                    .append("Last Accessed: ").append(accessed).append(" <br />\n")
+                    .append("""
+                                <p>The following data is in your session:<br /></p>
+                                <p></p><form action="BasicServlet" method="POST">
+                                Name of Session Attribute:<input type="text" size="20" name="dataname"><br />
+                                Value of Session Attribute:<input type="text" size="20" name="datavalue">
+                                <br /><input type="submit"></form><p>GET based form:<br /> 
+                                </p><form action="BasicServlet" method="GET">Name of Session Attribute:<input type="text" size="20" name="dataname"><br />
+                                Value of Session Attribute:<input type="text" size="20" name="datavalue"><br />
+                                <input type="submit"></form>
+                                <p><a href="BasicServlet?dataname=foo&amp;datavalue=bar">URL encoded </a></p></body>
+                                """);
 
 
             // set session info if needed
             String dataName = request.getParameter("dataname");
-            if (dataName != null && dataName.length() > 0) {
+            if (dataName != null && !dataName.isEmpty()) {
                 String dataValue = request.getParameter("datavalue");
                 session.setAttribute(dataName, dataValue);
             }
             sb.append("<hr />");
             sb.append("<p>");
-                Enumeration e = session.getAttributeNames();
+            Enumeration<String> e = session.getAttributeNames();
             while (e.hasMoreElements()) {
                 String name = (String) e.nextElement();
                 String value = session.getAttribute(name).toString();

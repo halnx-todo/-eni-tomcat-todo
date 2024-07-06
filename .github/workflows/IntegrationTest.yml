@@ -1,0 +1,418 @@
+#
+# https://github.com/nektos/act/issues/303 # do not works with podman (macosx)
+# podman machine init act-eni-todo --memory 62000 --cpus 8 --disk-size 150
+# podman machine start act-eni-todo
+# export DOCKER_HOST="unix://"$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' act-eni-todo)do
+#  act --container-architecture linux/arm64 --verbose --platform  ubuntu-22.04=catthehacker/ubuntu:full-22.04
+#  act --container-architecture linux/arm64/v8 --platform  ubuntu-22.04=catthehacker/ubuntu:act-22.04 --container-daemon-socket -
+#  act --container-architecture linux/arm64/v8 --platform  ubuntu-22.04=catthehacker/ubuntu:java-tools-22.04 --container-daemon-socket -
+#  act --container-architecture linux/arm64/v8 --platform  ubuntu-22.04=catthehacker/ubuntu:java-tools-22.04 --reuse --container-daemon-socket -
+name: eni-todo integration test
+on:
+  push:
+    branches:
+      - "continuous-testing-2404"
+      - "24.04"
+jobs:
+  build_maven:
+    env:
+      MULTIPART_LOCATION: "/usr/local/tomcat/files"
+      DB_DTB_JDBC_URL: 'jdbc:mariadb://127.0.0.1:3306/db_todo'
+      DB_DTB_USERNAME: "springuser"
+#      DB_DTB_PASSWORD: "mypassword-$RANDOM-$RANDOM"
+#      DB_DTB_ROOT_PASSWORD: "r00t-$RANDOM-$RANDOM"
+      DB_DTB_PORT: "3306"
+      DOCKER_STARTED: ""
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+#    services:
+#      registry:
+#        image: registry:2
+#        ports:
+#          - 5000:5000
+    steps:
+      - name: Set random environment variables
+        uses: joellefkowitz/random-env@v1.4.2
+        with:
+          names: |
+            DB_DTB_PASSWORD
+            DB_DTB_ROOT_PASSWORD
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Cache local Maven repository
+        id: cache-maven-restore
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ env.GITHUB_REPOSITORY_ID }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.GITHUB_REPOSITORY_ID }}-maven-
+
+      - name: Maven display-dependency-updates
+        run: mvn -B versions:display-dependency-updates --file pom.xml
+      - name: copy dependency
+        run: mvn --batch-mode dependency:copy-dependencies dependency:copy-dependencies dependency:go-offline
+      - name: build simpleapp
+        run: mvn --batch-mode package -P simpleapp
+      - name: build tomcat-h2
+        run: mvn --batch-mode package -P tomcat-h2
+      - name: build boot-mariadb
+        run: mvn --batch-mode package -P boot-mariadb
+      - name: build tomcat-mariadb
+        run: mvn --batch-mode package -P tomcat-mariadb -Dmultipartlocation=${MULTIPART_LOCATION} -Dmariajdbcurl="${DB_DTB_JDBC_URL}" -Dmariadbusername=${DB_DTB_USERNAME} -Dmariadbpassword=${DB_DTB_PASSWORD}
+
+      - name: Maven run wrapper:wrapper -Dmaven=3.9.8
+        run: mvn -N wrapper:wrapper -Dmaven=3.9.8
+      - name: Save maven cache
+        id: cache-maven-save
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ env.GITHUB_REPOSITORY_ID }}-maven-${{ hashFiles('**/pom.xml') }}
+
+####
+  build_containers:
+    env:
+      MULTIPART_LOCATION: "/usr/local/tomcat/files"
+      DB_DTB_JDBC_URL: 'jdbc:mariadb://127.0.0.1:3306/db_todo'
+      DB_DTB_USERNAME: "springuser"
+#      DB_DTB_PASSWORD: "mypassword-$RANDOM-$RANDOM"
+#      DB_DTB_ROOT_PASSWORD: "r00t-$RANDOM-$RANDOM"
+      DB_DTB_PORT: "3306"
+      DOCKER_STARTED: ""
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    #    services:
+    #      registry:
+    #        image: registry:2
+    #        ports:
+    #          - 5000:5000
+    steps:
+      - name: Set random environment variables
+        uses: joellefkowitz/random-env@v1.4.2
+        with:
+          names: |
+            DB_DTB_PASSWORD
+            DB_DTB_ROOT_PASSWORD
+
+      - name: Checkout
+        uses: actions/checkout@v4
+#
+#      - name: Set up JDK 21
+#        uses: actions/setup-java@v4
+#        with:
+#          java-version: '21'
+#          distribution: 'temurin'
+#          cache: maven
+#
+#      - name: Cache local Maven repository
+#        id: cache-maven-restore
+#        uses: actions/cache@v4
+#        with:
+#          path: ~/.m2/repository
+#          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+#          restore-keys: |
+#            ${{ runner.os }}-maven-
+        # Add support for more platforms with QEMU (optional)
+        # https://github.com/docker/setup-qemu-action
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHRC_IO_TOKEN }}
+
+      - name: Build and push Docker image (eni-todo:v24.04-tomcat-mariadb-harcoded) in ghcr.io
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          cache-from: type=registry,ref=ghcr.io/halnx-todo/eni-tomcat-todo:buildcache
+          cache-to: type=registry,ref=ghcr.io/halnx-todo/eni-tomcat-todo:buildcache,mode=max
+          tags: ghcr.io/halnx-todo/eni-tomcat-todo:v24.04-tomcat-mariadb-harcoded
+          target: eni-todo-tomcat-mariadb-harcoded
+#          platforms: |
+#            linux/amd64
+#            linux/arm64
+          build-args: |
+            MULTIPART_LOCATION="${MULTIPART_LOCATION}"
+            DB_DTB_JDBC_URL="${DB_DTB_JDBC_URL}"
+            DB_DTB_USERNAME="${DB_DTB_USERNAME}"
+            DB_DTB_PASSWORD="${DB_DTB_USERNAME}"
+
+      - name: Build and push Docker image (tomcat-eni-todo:v24.04-tomcat-h2-env)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          cache-from: type=registry,ref=ghcr.io/halnx-todo/eni-tomcat-todo:buildcache
+          cache-to: type=registry,ref=ghcr.io/halnx-todo/eni-tomcat-todo:buildcache,mode=max
+          tags: ghcr.io/halnx-todo/eni-tomcat-todo:v24.04-tomcat-h2-env
+          target: eni-todo-tomcat-h2-env
+
+      - name: Build and push Docker image (tomcat-eni-todo:v24.04-tomcat-mariadb-env)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          cache-from: type=registry,ref=ghcr.io/halnx-todo/eni-tomcat-todo:buildcache
+          cache-to: type=registry,ref=ghcr.io/halnx-todo/eni-tomcat-todo:buildcache,mode=max
+          tags:  ghcr.io/halnx-todo/eni-tomcat-todo:v24.04-tomcat-mariadb-env
+          target: eni-todo-tomcat-mariadb-env
+
+      - name: Build and push Docker image (tomcat-eni-todo:v24.04-tomcat-mariadb-kub)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          cache-from: type=registry,ref=ghcr.io/halnx-todo/eni-tomcat-todo:buildcache
+          cache-to: type=registry,ref=ghcr.io/halnx-todo/eni-tomcat-todo:buildcache,mode=max
+          tags: ghcr.io/halnx-todo/eni-tomcat-todo:v24.04-tomcat-mariadb-kub
+          target: eni-todo-tomcat-mariadb-kub
+
+  run_containers_h2:
+    needs: [build_containers,build_maven]
+    env:
+      MULTIPART_LOCATION: "/usr/local/tomcat/files"
+      DB_DTB_JDBC_URL: 'jdbc:mariadb://127.0.0.1:3306/db_todo'
+      DB_DTB_USERNAME: "springuser"
+      DB_DTB_PORT: "3306"
+      DOCKER_STARTED: ""
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Set random environment variables
+        uses: joellefkowitz/random-env@v1.4.2
+        with:
+          names: |
+            DB_DTB_PASSWORD
+            DB_DTB_ROOT_PASSWORD
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Cache local Maven repository
+        id: cache-maven-restore
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ env.GITHUB_REPOSITORY_ID }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.GITHUB_REPOSITORY_ID }}-maven-
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHRC_IO_TOKEN }}
+
+      - name: pull ghcr.io/halnx-todo/eni-tomcat-todo:v24.04-tomcat-h2-env
+        run: |
+         docker pull ghcr.io/halnx-todo/eni-tomcat-todo:v24.04-tomcat-h2-env &&\
+         docker tag ghcr.io/halnx-todo/eni-tomcat-todo:v24.04-tomcat-h2-env tomcat-eni-todo:v24.04-tomcat-h2-env
+
+      - name: Run eni-todo-tomcat-h2-env
+        run: docker run --rm -d --name=24.04-tomcat-h2-env -p 8080:8080 tomcat-eni-todo:v24.04-tomcat-h2-env
+
+#      - name: Run eni-todo-tomcat-h2-env
+#        run: docker inspect 24.04-tomcat-h2-env
+
+      - name: Run images
+        run: docker ps
+
+      - name: docker logs
+        run: docker logs 24.04-tomcat-h2-env 2>&1
+
+      - name: this is a reminder that grep return error code if empty and '!' allows us to by-pass that (otherwise it break the pipeline)
+        run: |
+          ! docker logs 24.04-tomcat-h2-env 2>&1 | grep -q "org.apache.catalina.startup.Catalina.start Server startup"
+
+      - name: wait 8 min
+        run: sleep 480 ;
+
+#      - name: Check that images run during at most 10 min
+#        run: |
+#          for TRY in $(seq 1 10); do
+#            echo "---${TRY}---";
+#            DOCKER_STARTED=$(docker logs 24.04-tomcat-mariadb-env 2>&1 | grep "org.apache.catalina.startup.Catalina.start Server startup" || echo "");
+#            echo "---${DOCKER_STARTED}---"
+#            if [[ -z ${DOCKER_STARTED} ]]
+#            then
+#              echo "--- not yet wait 120 sec ---";
+#              docker logs --since=1m 24.04-tomcat-h2-env;
+#              sleep 120;
+#            else
+#              echo "--- OK ---";
+#              docker logs 24.04-tomcat-h2-env;
+#              curl --fail-with-body -m 1 -s -vL http://127.0.0.1:8080/eni-todo/healthz;
+#              break;
+#            fi
+#          done
+
+      - name: Maven run jmeter test
+        continue-on-error: true
+        run: mvn -N wrapper:wrapper -Dmaven=3.9.8 && ./mvnw -P jmeter -B verify --file pom.xml
+
+      - name: display jmeter result
+        run: cat target/jmeter/results/*.csv
+
+
+      - name: stop 24.04-tomcat-h2-env
+        run : docker stop 24.04-tomcat-h2-env
+
+      #########
+  run_containers_mariadb:
+    needs: [build_containers,build_maven]
+    env:
+      MULTIPART_LOCATION: "/usr/local/tomcat/files"
+      DB_DTB_JDBC_URL: 'jdbc:mariadb://127.0.0.1:3306/db_todo'
+      DB_DTB_NAME: "db_todo"
+      DB_DTB_USERNAME: "springuser"
+      DB_DTB_PORT: "3306"
+      DOCKER_STARTED: ""
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Set random environment variables
+        uses: joellefkowitz/random-env@v1.4.2
+        with:
+          names: |
+            DB_DTB_PASSWORD
+            DB_DTB_ROOT_PASSWORD
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Cache local Maven repository
+        id: cache-maven-restore
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ env.GITHUB_REPOSITORY_ID }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.GITHUB_REPOSITORY_ID }}-maven-
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHRC_IO_TOKEN }}
+
+      - name: Run mariadb
+        run: |
+          docker \
+            run --rm \
+              --name=mariadb \
+              -e MYSQL_USER="${DB_DTB_USERNAME}" \
+              -e MYSQL_PASSWORD="${DB_DTB_PASSWORD}" \
+              -e MYSQL_DATABASE="${DB_DTB_NAME}" \
+              -e MYSQL_ROOT_PASSWORD="${DB_DTB_USERNAME}" \
+              -p ${DB_DTB_PORT}:${DB_DTB_PORT} \
+              -d mariadb:11.2.2
+
+      - name: pull ghcr.io/halnx-todo/eni-tomcat-todo:v24.04-tomcat-mariadb-env
+        run: |
+          docker pull ghcr.io/halnx-todo/eni-tomcat-todo:v24.04-tomcat-mariadb-env &&\
+          docker tag ghcr.io/halnx-todo/eni-tomcat-todo:v24.04-tomcat-mariadb-env tomcat-eni-todo:v24.04-tomcat-mariadb-env
+
+      - name: Run tomcat-eni-todo:v24.04-tomcat-mariadb-env
+        run: |
+          docker \
+              run --rm -p 8080:8080 \
+              --name=24.04-tomcat-mariadb-env \
+              --link mariadb:mariadb \
+              -e SPRING_PROFILES_ACTIVE="tomcat-mariadb-env" \
+              -e MULTIPART_LOCATION="${MULTIPART_LOCATION}" \
+              -e DB_DTB_JDBC_URL="jdbc:mariadb://mariadb:3306/db_todo" \
+              -e DB_DTB_USERNAME="${DB_DTB_USERNAME}" \
+              -e DB_DTB_PASSWORD="${DB_DTB_PASSWORD}" \
+              -d tomcat-eni-todo:v24.04-tomcat-mariadb-env
+
+      - name: wait 8 min
+        run: sleep 480 ;
+
+#      - name: Check that images run during at most 10 min
+#        run: |
+#          for TRY in $(seq 1 10); do
+#            echo "---${TRY}---";
+#            DOCKER_STARTED=$((docker logs 24.04-tomcat-mariadb-env 2>&1 | grep "org.apache.catalina.startup.Catalina.start Server startup") || echo "");
+#            echo "---${DOCKER_STARTED}---"
+#            if [[ -z ${DOCKER_STARTED} ]]
+#            then
+#              echo "--- not yet wait 120 sec---";
+#              docker logs 24.04-tomcat-mariadb-env;
+#              sleep 120;
+#            else
+#              echo "--- OK ---";
+#              docker logs 24.04-tomcat-mariadb-env;
+#              curl --fail-with-body -m 1 -s -vL http://127.0.0.1:8080/eni-todo/healthz;
+#              break;
+#            fi
+#          done
+
+      - name: Maven run jmeter test
+        continue-on-error: true
+        run: mvn -N wrapper:wrapper -Dmaven=3.9.8 && ./mvnw -P jmeter -B verify --file pom.xml
+
+      - name: display jmeter result
+        run: cat target/jmeter/results/*.csv
+
+      - name: stop 24.04-tomcat-h2-env
+        run: |
+          docker stop 24.04-tomcat-mariadb-env &&\
+          docker stop mariadb
