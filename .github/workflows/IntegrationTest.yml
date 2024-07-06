@@ -11,8 +11,7 @@ name: eni-todo integration test
 on:
   push:
     branches:
-      - "continuous-testing-2404"
-      - "24.04"
+      - "ci"
 jobs:
   build_maven:
     env:
