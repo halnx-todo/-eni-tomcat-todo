@@ -1,10 +1,6 @@
 # This is a Dockerfile for pedagogical purpose
 # It can be use to build the docker image manually :
 #
-# docker volume create maven
-# docker build -v /tmp/.m2 -t eni-todo-tomcat:latest --target eni-todo-tomcat-latest . &&\
-# docker build -t eni-todo-tomcat-mariadb:latest --target eni-todo-tomcat-mariadb-latest . &&\
-# docker build -t eni-todo:latest --target eni-todo .
 
 FROM maven:3.6-openjdk-11-slim AS builder
 ARG SKIP_TESTS="true"
@@ -17,9 +13,6 @@ ARG DB_DTB_PASSWORD="mypassword-quoor-uHoe7z"
 
 COPY pom.xml .
 RUN  mvn --batch-mode dependency:copy-dependencies dependency:copy-dependencies dependency:go-offline
-#COPY src/maim/java/net/diehard/sample/todowebsite/Application.java ./src/maim/java/net/diehard/sample/todowebsite/Application.java
-#RUN  --mount=type=cache,target=/tmp/.m2 mvn --batch-mode package -P simpleapp -Dmaven.repo.local=/tmp/.m2 -DskipTests=${SKIP_TESTS}
-#RUN  --mount=type=cache,target=/tmp/.m2 mvn --batch-mode package -P tomcat-h2 -Dmaven.repo.local=/tmp/.m2 -DskipTests=${SKIP_TESTS}
 
 COPY src ./src
 
@@ -37,7 +30,7 @@ RUN  --mount=type=cache,target=/var/cache/m2 mvn --batch-mode package -P tomcat-
 
 ####### eni-todo-tomcat-base #######
 
-FROM tomcat:jdk11-openjdk-slim AS eni-todo-tomcat-base
+FROM tomcat:9-jre11-temurin AS eni-todo-tomcat-base
 
 ARG MULTIPART_LOCATION=/usr/local/tomcat/files
 
@@ -119,4 +112,3 @@ ENV SPRING_PROFILES_ACTIVE=boot-mariadb-env
 COPY --from=builder --chown=1000:0 /target/eni-todo-boot-mariadb.jar /usr/local/eni-todo/eni-todo.jar
 
 ####### eni-todo-boot-mariadb-kube #######
-#@TODO
